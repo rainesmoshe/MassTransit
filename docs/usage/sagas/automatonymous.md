@@ -315,7 +315,7 @@ public class OrderStateMachine :
     public OrderStateMachine()
     {
         Event(() => ExternalOrderSubmitted, e => e
-            .CorrelateBy(i => i.OrderNumber, x => x.Message.OrderNumber)
+            .CorrelateBy(i => i.OrderNumber.ToString(), x => x.Message.OrderNumber)
             .SelectId(x => NewId.NextGuid()));
     }
 
@@ -435,7 +435,7 @@ public class OrderStateMachine :
 
             e.OnMissingInstance(m =>
             {
-                return m.ExecuteAsync(x => x.RespondAsync<OrderNotFound>(new { x.OrderId }));
+                return m.ExecuteAsync(x => x.RespondAsync<OrderNotFound>(new { x.Message.OrderId }));
             });
         });
     }
@@ -485,6 +485,17 @@ public class OrderStateMachine :
 When using _InsertOnInitial_, it is critical that the saga repository is able to detect duplicate keys (in this case, _CorrelationId_ - which is initialized using _OrderId_). In this case, having a clustered primary key on _CorrelationId_ would prevent duplicate instances from being inserted. If an event is correlated using a different property, make sure that the database enforces a unique constraint on the instance property and the saga factory initializes the instance property with the event property value.
 
 ```cs
+ public class OrderState :
+    SagaStateMachineInstance
+    {
+        public Guid CorrelationId { get; set; }
+        public string CurrentState { get; set; }
+        public DateTime? OrderDate { get; set; }
+
+        public string ExternalOrderNumber { get; set; }
+        public int ReadyEventStatus { get; set; }
+
+    }
 public interface ExternalOrderSubmitted
 {    
     string OrderNumber { get; }
@@ -504,7 +515,7 @@ public class OrderStateMachine :
             e.SetSagaFactory(context => new OrderState
             {
                 CorrelationId = context.CorrelationId ?? NewId.NextGuid(),
-                OrderNumber = context.Message.OrderNumber,
+                ExternalOrderNumber = context.Message.OrderNumber,
             })
         });
 
